@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>웹캠</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script type="text/javascript">
+	function camera_start() {
+		var video = document.getElementById("webCamera");
+		if(navigator.mediaDevices.getUserMedia) {
+			navigator.mediaDevices.getUserMedia({ video : true })
+			.then(function(stream) {
+				video.srcObject = stream;
+			});
+		}
+	}
+</script>
+<script type="text/javascript">
+	var frame_count = 0
+	
+	var detectBox = new Array();
+	
+	function drawImage() {
+		var video = document.getElementById("webCamera");
+		var canvas = document.getElementById("videoCanvas");
+		var ctx = canvas.getContext('2d');
+		canvas.width = video.videoWidth;
+		canvas.height = video.videoHeight;
+		ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+		
+		var canvas_img = canvas.toDataURL("image/jpeg", 1.0);
+		//console.log("canvas_img = " + canvas_img);
+		
+		/* ctx.fillStyle = "blue";
+		ctx.lineWidth = 1;
+		ctx.font = "20px arial";
+		ctx.fillText("yolo 클래스를 출력할 겁니다", 20, 40);
+		var x1 = 0;
+		var y1 = 0;
+		var x2 = 300;
+		var y2 = 400;
+		ctx.rect(x1, y1, x2, y2);
+		ctx.lineWidth = "6";
+		ctx.strokeStyle = "red";
+		ctx.stroke(); */
+		
+		for(var i = 0; i < detectBox.length; i++) {
+			var box = detectBox[i];
+			var cls = box.cls
+			var conf = box.conf
+			var x1 = box.left
+			var y1 = box.top
+			var x2 = box.right
+			var y2 = box.bottom
+			ctx.fillStyle = "blue";
+			ctx.lineWidth = 1;
+			ctx.font = "20px arial";
+			ctx.fillText(cls + " : " + conf, x1+30, y1+30);
+			ctx.rect(x1, y1, x2, y2);
+			ctx.lineWidth = "6";
+			ctx.strokeStyle = "red";
+			ctx.stroke();
+		}
+		
+		frame_count = frame_count + 1;
+	
+		if (frame_count == 24) {
+				frame_count = 0;
+				axios({
+					method : "post",
+					url : "sendImage.do",
+					data : {
+						"img_data" : canvas_img
+					},
+					headers : {
+						'Content-Type' : "image/jpeg"
+					}
+				}).then(
+						function(response) {
+							console.log("response = " + response);
+							console.log("JSON.stringify(response.data) = "
+									+ JSON.stringify(response.data));
+							detectBox.splice(0, detectBox.length);
+							
+							for(var i = 0; i < response.data.length; i++) {
+								l = response.data[i].left;
+								t = response.data[i].top;
+								r = response.data[i].right;
+								b = response.data[i].bottom;
+								cl = response.data[i].cls;
+								co = response.data[i].conf;
+								var detect = {"left" : l, "top" : t, "right" : r, "bottom" : b, "cls" : cl, "conf" : co};
+								detectBox[detectBox.length] = detect;
+							}
+						});
+			}
+
+		setTimeout(drawImage, 1000 / 24);
+	}
+</script>
+</head>
+<body onload = "camera_start()">
+	<h3>webcam.html</h3>
+	<video autoplay="true" id="webCamera" style = "display : none"></video><br/>
+	<canvas id = "videoCanvas" style = "background-color : green;"></canvas>
+	<script type="text/javascript">
+		var video = document.getElementById("webCamera");
+		video.onplay = function() {
+			setTimeout(drawImage, 300);
+		};
+	</script>
+</body>
+</html>
